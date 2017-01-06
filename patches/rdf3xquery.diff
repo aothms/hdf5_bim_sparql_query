@@ -1,0 +1,60 @@
+diff --git a/tools/rdf3xquery/rdf3xquery.cpp b/tools/rdf3xquery/rdf3xquery.cpp
+index 6539bd1..d762f69 100755
+--- a/tools/rdf3xquery/rdf3xquery.cpp
++++ b/tools/rdf3xquery/rdf3xquery.cpp
+@@ -13,8 +13,15 @@
+ #include "lineeditor/LineInput.hpp"
+ #endif
+ #include <iostream>
++#include <iomanip>
+ #include <fstream>
+ #include <cstdlib>
++#include <time.h>
++
++// Timing utility macros
++#define time(x) (clock_gettime(CLOCK_MONOTONIC_RAW, &x));
++#define time_diff(x, y) (y.tv_sec-x.tv_sec + (y.tv_nsec-x.tv_nsec) / 1000000000.f)
++
+ //---------------------------------------------------------------------------
+ // RDF-3X
+ // (c) 2008 Thomas Neumann. Web site: http://www.mpi-inf.mpg.de/~neumann/rdf3x
+@@ -146,6 +153,9 @@ int main(int argc,char* argv[])
+       cerr << "usage: " << argv[0] << " <database> [queryfile]" << endl;
+       return 1;
+    }
++   
++   timespec tp0, tp1, tq0, tq1;
++   time(tp0);
+ 
+    // Open the database
+    Database db;
+@@ -153,6 +163,8 @@ int main(int argc,char* argv[])
+       cerr << "unable to open database " << argv[1] << endl;
+       return 1;
+    }
++   
++   time(tp1);
+ 
+    // Execute a single query?
+    if (argc==3) {
+@@ -165,7 +177,9 @@ int main(int argc,char* argv[])
+       if (query.substr(0,8)=="explain ") {
+          runQuery(db,query.substr(8),true);
+       } else {
++         time(tq0);
+          runQuery(db,query,false);
++         time(tq1);
+       }
+    } else {
+       // No, accept user input
+@@ -188,5 +202,10 @@ int main(int argc,char* argv[])
+          cout.flush();
+       }
+    }
++   
++   cerr.setf(ios::fixed,ios::floatfield);
++   cerr.precision(3);
++   cerr << "Parse time: " << time_diff(tp0, tp1) << " secs" << endl;
++   cerr << "Query time: " << time_diff(tq0, tq1) << " secs" << endl;
+ }
+ //---------------------------------------------------------------------------

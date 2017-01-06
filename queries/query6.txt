@@ -1,0 +1,21 @@
+PREFIX ifc: <http://ifcowl.openbimstandards.org/IFC2X3_TC1#>
+PREFIX xsd:  <http://www.w3.org/2001/XMLSchema#>
+PREFIX list:  <https://w3id.org/list#>
+PREFIX express:  <https://w3id.org/express#>
+
+SELECT ?guid
+WHERE {
+    ?o a ifc:IfcOpeningElement .
+    ?o ifc:globalId_IfcRoot ?guid_ .
+    ?guid_ express:hasString ?guid .
+    ?o ifc:objectPlacement_IfcProduct ?p .
+    ?p ifc:relativePlacement_IfcLocalPlacement ?a .
+    ?a ifc:location_IfcPlacement ?c .
+    ?c ifc:coordinates_IfcCartesianPoint ?coords_0 .
+    ?coords_0 list:hasNext ?coords_1 .
+    ?coords_1 list:hasNext ?coords_2 .
+    ?coords_2 list:hasContents ?z_ .
+    ?z_ express:hasDouble ?z .
+    FILTER (?z = "0.0"^^xsd:double)
+}
+ORDER BY ASC(?guid)

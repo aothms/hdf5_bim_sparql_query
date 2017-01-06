@@ -1,0 +1,222 @@
+diff --git a/src/ifcparse/IfcHdf5File.cpp b/src/ifcparse/IfcHdf5File.cpp
+index 5181056..023a437 100644
+--- a/src/ifcparse/IfcHdf5File.cpp
++++ b/src/ifcparse/IfcHdf5File.cpp
+@@ -379,12 +379,12 @@ void IfcParse::IfcHdf5File::write_vlen_t(void*& ptr, size_t n_elements, void* vl
+ 
+ template <typename T>
+ void IfcParse::IfcHdf5File::write_aggregate(void*& ptr, const T& ts) const {
+-	size_t elem_size = get_datatype<typename T::value_type>()->getSize();
++	size_t elem_size = GET_DATATYPE(typename T::value_type)->getSize();
+ 	size_t n_elements = ts.size();
+ 	size_t size_in_bytes = elem_size * n_elements;
+ 	void* aggr_data = allocator.allocate(size_in_bytes);
+ 	void* aggr_ptr = aggr_data;
+-	for (T::const_iterator it = ts.begin(); it != ts.end(); ++it) {
++	for (typename T::const_iterator it = ts.begin(); it != ts.end(); ++it) {
+ 		write_number_of_size(aggr_ptr, elem_size, *it);
+ 	}
+ 	write_vlen_t(ptr, n_elements, aggr_data);
+@@ -428,7 +428,7 @@ void IfcParse::IfcHdf5File::write_aggregate2(void*& ptr, const std::vector< std:
+ 	size_t size_in_bytes = elem_size * n_elements;
+ 	void* aggr_data = allocator.allocate(size_in_bytes);
+ 	void* aggr_ptr = aggr_data;
+-	for (std::vector< std::vector<T> >::const_iterator it = ts.begin(); it != ts.end(); ++it) {
++	for (typename std::vector< std::vector<T> >::const_iterator it = ts.begin(); it != ts.end(); ++it) {
+ 		write_aggregate(aggr_ptr, *it);
+ 	}
+ 	write_vlen_t(ptr, n_elements, aggr_data);
+@@ -438,7 +438,7 @@ template <typename T>
+ void IfcParse::IfcHdf5File::write_reference_attribute(void*& ptr, const std::string& dsn, const std::vector<T>& vs) {
+ 	const std::string dsn_path = "/population/" + dsn;
+ 	const hsize_t s = vs.size();
+-	const H5::DataType& dt = *get_datatype<T>();
++	const H5::DataType& dt = *GET_DATATYPE(T);
+ 	const size_t size_in_bytes = dt.getSize() * vs.size();
+ 
+ 	H5::DataSpace space(1, &s);
+@@ -492,7 +492,7 @@ void IfcParse::IfcHdf5File::write_reference_attribute(void*& ptr, const std::str
+ 		H5Pclose(plist->getId());
+ 	}
+ 	
+-	delete[] buffer;
++	delete[] (uint8_t*) buffer;
+ 	ds.close();
+ }
+ 
+@@ -562,12 +562,12 @@ void IfcParse::IfcHdf5File::write_reference_attribute2(void*& ptr, const std::st
+ 		}
+ 		
+ 		if (dt == 0) {
+-			dt = get_datatype<T>();
++			dt = GET_DATATYPE(T);
+ 		}
+ 		
+ 	} else {
+ 		s = new hsize_t(vs.size());
+-		dt = dt2 = new H5::VarLenType(get_datatype<T>());
++		dt = dt2 = new H5::VarLenType(GET_DATATYPE(T));
+ 	}
+ 
+ 	const std::string dsn_path = "/population/" + dsn;
+@@ -632,7 +632,7 @@ void IfcParse::IfcHdf5File::write_reference_attribute2(void*& ptr, const std::st
+ 	ds.reference(ptr, dsn_path.c_str());
+ 	advance(ptr, sizeof(hobj_ref_t));
+ 	
+-	delete[] buffer;
++	delete[] (uint8_t*) buffer;
+ 	ds.close();
+ 
+ 	if (plist != &H5::DSetCreatPropList::DEFAULT) {
+@@ -1225,7 +1225,7 @@ void IfcParse::IfcHdf5File::write_population(IfcFile& f) {
+ 		}
+ 
+ 		// allocator.free();
+-		delete[] data;
++		delete[] (uint8_t*) data;
+ 		
+ 		for (auto it = es.begin(); it != es.end(); ++it) {
+ 			if (types_with_instiated_selected.find((**it).declaration().type()) == types_with_instiated_selected.end()) {
+diff --git a/src/ifcparse/IfcHdf5File.h b/src/ifcparse/IfcHdf5File.h
+index f52d7f1..855e421 100644
+--- a/src/ifcparse/IfcHdf5File.h
++++ b/src/ifcparse/IfcHdf5File.h
+@@ -24,10 +24,12 @@
+ 
+ #include "H5Cpp.h"
+ 
+-#include "../ifcparse/Hdf5Settings.h"
+ #include "../ifcparse/IfcUtil.h"
++#include "../ifcparse/Hdf5Settings.h"
+ #include "../ifcparse/IfcFile.h"
+ 
++#define GET_DATATYPE(T) (default_types.find(IfcUtil::cpp_to_schema_type<T>::schema_type)->second)
++
+ namespace IfcParse {
+ 
+ 	class IfcHdf5File {
+@@ -38,6 +40,7 @@ namespace IfcParse {
+ 			mutable std::vector<uint8_t*> buffers;
+ 		public:
+ 			void* allocate(size_t n) const {
++				// Never added to buffer?
+ 				return new uint8_t[n];
+ 			}
+ 			void free() {
+@@ -94,19 +97,12 @@ namespace IfcParse {
+ 		void write_schema(const schema_definition& schema);
+ 		void write_population(IfcFile& f);
+ 
+-		template <typename T>
+-		const H5::DataType* get_datatype() const {
+-			return default_types.find(IfcUtil::cpp_to_schema_type<T>::schema_type)->second;
+-		}
+-
+ 		void advance(void*& ptr, size_t n) const;
+ 		
+ 		template <typename T>
+ 		void write(void*& ptr, const T& t) const;
+ 		
+-		template <>
+-		void write(void*& ptr, const std::string& s) const;
+-
++		
+ 		void write_vlen_t(void*& ptr, size_t n_elements, void* vlen_data) const;
+ 
+ 		template <typename T>
+@@ -136,6 +132,16 @@ namespace IfcParse {
+ 			write_population(*f);
+ 		};
+ 	};
++	
++	
++	template <>
++	void IfcHdf5File::write(void*& ptr, const std::string& s) const;
++
++	template <>
++	void IfcHdf5File::write_aggregate(void*& ptr, const std::vector<std::string>& ts) const;
++
++	template <>
++	void IfcHdf5File::write_aggregate(void*& ptr, const IfcEntityList::ptr& ts) const;
+ 
+ }
+ 
+diff --git a/src/ifcparse/IfcLateBoundEntity.h b/src/ifcparse/IfcLateBoundEntity.h
+index acfe75f..d37b74a 100644
+--- a/src/ifcparse/IfcLateBoundEntity.h
++++ b/src/ifcparse/IfcLateBoundEntity.h
+@@ -87,7 +87,7 @@ namespace IfcParse {
+ 		const IfcAbstractEntity& data() const { return *data_; }
+ 		IfcAbstractEntity& data() { return *data_; }
+ 
+-		const IfcParse::declaration& IfcParse::IfcLateBoundEntity::declaration() const;
++		const IfcParse::declaration& declaration() const;
+ 	};
+ 
+ }
+diff --git a/src/ifcparse/IfcParse.h b/src/ifcparse/IfcParse.h
+index e38fc4b..bceee65 100644
+--- a/src/ifcparse/IfcParse.h
++++ b/src/ifcparse/IfcParse.h
+@@ -42,6 +42,7 @@
+ 
+ #include "../ifcparse/IfcCharacterDecoder.h"
+ #include "../ifcparse/IfcUtil.h"
++#include "../ifcparse/IfcLateBoundEntity.h"
+ 
+ #ifdef USE_IFC4
+ #include "../ifcparse/Ifc4.h"
+@@ -313,7 +314,7 @@ namespace IfcParse {
+ 				if (current_inst_name_ != 0) {
+ 					try {
+ 						inst_data = new Entity(current_inst_name_, file_);
+-						if (file_->create_latebound_entities()) {
++						if (false) {
+ 							entity_instance = new IfcLateBoundEntity(inst_data);
+ 						} else {
+ 							entity_instance = IfcSchema::SchemaEntity(inst_data);
+diff --git a/src/ifcparse/IfcUtil.cpp b/src/ifcparse/IfcUtil.cpp
+index 0e1d6fc..9b514a9 100644
+--- a/src/ifcparse/IfcUtil.cpp
++++ b/src/ifcparse/IfcUtil.cpp
+@@ -154,4 +154,8 @@ IfcUtil::IfcBaseClass::~IfcBaseClass() {
+ void IfcUtil::IfcBaseClass::data(IfcAbstractEntity* d) {
+ 	delete data_;
+ 	data_ = d; 
+-}
+\ No newline at end of file
++}
++
++IfcParse::simple_type::data_type IfcUtil::cpp_to_schema_type < bool   > ::schema_type = IfcParse::simple_type::boolean_type;
++IfcParse::simple_type::data_type IfcUtil::cpp_to_schema_type < int    > ::schema_type = IfcParse::simple_type::integer_type;
++IfcParse::simple_type::data_type IfcUtil::cpp_to_schema_type < double > ::schema_type = IfcParse::simple_type::real_type;
+diff --git a/src/ifcparse/IfcUtil.h b/src/ifcparse/IfcUtil.h
+index 140a461..667202b 100644
+--- a/src/ifcparse/IfcUtil.h
++++ b/src/ifcparse/IfcUtil.h
+@@ -134,11 +134,11 @@ namespace IfcUtil {
+ 	bool valid_binary_string(const std::string& s);
+ 
+ 	template <typename T> struct cpp_to_schema_type;
+-	template <>           struct cpp_to_schema_type < boost::dynamic_bitset<> > { static const IfcParse::simple_type::data_type schema_type = IfcParse::simple_type::binary_type;  };
+-	template <>           struct cpp_to_schema_type < bool                    > { static const IfcParse::simple_type::data_type schema_type = IfcParse::simple_type::boolean_type; };
+-	template <>           struct cpp_to_schema_type < int                     > { static const IfcParse::simple_type::data_type schema_type = IfcParse::simple_type::integer_type; };
+-	template <>           struct cpp_to_schema_type < double                  > { static const IfcParse::simple_type::data_type schema_type = IfcParse::simple_type::real_type;    };
+-	template <>           struct cpp_to_schema_type < std::string             > { static const IfcParse::simple_type::data_type schema_type = IfcParse::simple_type::string_type;  };
++	template <>           struct cpp_to_schema_type < boost::dynamic_bitset<> > { static IfcParse::simple_type::data_type schema_type; };
++	template <>           struct cpp_to_schema_type < bool                    > { static IfcParse::simple_type::data_type schema_type; };
++	template <>           struct cpp_to_schema_type < int                     > { static IfcParse::simple_type::data_type schema_type; };
++	template <>           struct cpp_to_schema_type < double                  > { static IfcParse::simple_type::data_type schema_type; };
++	template <>           struct cpp_to_schema_type < std::string             > { static IfcParse::simple_type::data_type schema_type; };
+ 
+ 	template <IfcParse::simple_type::data_type T> 
+ 	            struct schema_to_cpp_type;
+@@ -257,7 +257,7 @@ public:
+ 			const std::vector<IfcUtil::IfcBaseClass*>& from = *outer;
+ 			typename std::vector<U*> to;
+ 			for (inner_it inner = from.begin(); inner != from.end(); ++ inner) {
+-				if (all || (*inner)->is(U::Class())) to.push_back((U*)*inner);
++				if (all || (*inner)->as(U::Class())) to.push_back((U*)*inner);
+ 			}
+ 			r->push(to);
+ 		}

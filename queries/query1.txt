@@ -1,0 +1,9 @@
+PREFIX ifc: <http://ifcowl.openbimstandards.org/IFC2X3_TC1#>
+PREFIX express:  <https://w3id.org/express#>
+
+SELECT ?window ?height
+WHERE {
+    ?window a ifc:IfcWindow .
+    ?window ifc:overallHeight_IfcWindow ?height_ .
+    ?height_ express:hasDouble ?height
+}
