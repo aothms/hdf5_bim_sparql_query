@@ -23,6 +23,7 @@ echo "sudo apt-get update"
 echo "sudo apt-get install oracle-java8-installer g++ make maven git zip unzip python-pip"
 echo "sudo python -m pip install --upgrade pip"
 echo "sudo python -m pip install h5py==2.7.0rc2 pyparsing rdflib"
+exit 1
 done
 
 
@@ -123,12 +124,13 @@ mv Architectural/DC_Riverside_Bldg-LOD_300.ifc riverside/riverside.ifc
 touch $BUILDPATH/setup
 fi
 
-echo "JVM_ARGS=-Xmx3g $BUILDPATH"'/apache-jena-3.1.1/bin/riot --out=nt $1 > $2' > $BUILDPATH/riot.sh
-echo "JVM_ARGS=-Xmx3g $BUILDPATH"'/apache-jena-3.1.1/bin/sparql --data=$1 --query=$2' > $BUILDPATH/query_jena.sh
-echo "java -Xmx3g -jar $BUILDPATH"'/arq_query/arq_query.jar $1 $2' > $BUILDPATH/query_arq.sh
-echo "JVM_ARGS=-Xmx3g $BUILDPATH"'/apache-jena-3.1.1/bin/tdbquery --loc=$1 --query=$2' > $BUILDPATH/query_tdb.sh
+MEM=`grep MemTotal /proc/meminfo | awk '{print int($2/1000000)}'`
+echo "JVM_ARGS=-Xmx${MEM}g $BUILDPATH"'/apache-jena-3.1.1/bin/riot --out=nt $1 > $2' > $BUILDPATH/riot.sh
+echo "JVM_ARGS=-Xmx${MEM}g $BUILDPATH"'/apache-jena-3.1.1/bin/sparql --data=$1 --query=$2' > $BUILDPATH/query_jena.sh
+echo "java -Xmx${MEM}g -jar $BUILDPATH"'/arq_query/arq_query.jar $1 $2' > $BUILDPATH/query_arq.sh
+echo "JVM_ARGS=-Xmx${MEM}g $BUILDPATH"'/apache-jena-3.1.1/bin/tdbquery --loc=$1 --query=$2' > $BUILDPATH/query_tdb.sh
 
-convert_to_rdf="java -Xmx3g -jar $BUILDPATH/IFC-to-RDF-converter/converter/IFC-to-RDF-converter.jar"
+convert_to_rdf="java -Xmx${MEM}g -jar $BUILDPATH/IFC-to-RDF-converter/converter/IFC-to-RDF-converter.jar"
 convert_to_nt="/bin/sh $BUILDPATH/riot.sh"
 convert_to_rdf3x="$BUILDPATH/gh-rdf3x/bin/rdf3xload"
 convert_to_tdb="$BUILDPATH/apache-jena-3.1.1/bin/tdbloader -loc"
@@ -164,6 +166,9 @@ function trace_time() {
         t=$( { time $1 &>/dev/null ; } 2>&1 )
         >&2 echo "measured time [$i] (real, user, system) $t"
         times="$times `echo $t | grep TIME= | cut -c6-`"
+        if [ "$FULL_BENCHMARK" = "0" ]; then
+        break
+        fi
     done
     echo `min_value $times`
 }
@@ -177,23 +182,31 @@ function capture_reported_time() {
         t="$qt,$pt"
         >&2 echo "reported time [$i] (query, parse) $t"
         times="$times $t"
+        if [ "$FULL_BENCHMARK" = "0" ]; then
+        break
+        fi
     done
     echo `min_value $times`
 }
 
 function trace() {
+    if [ "$FULL_BENCHMARK" = "1" ]; then    
     >&2 echo "$1"
     >&2 echo "$2"
     br=`trace_bytes_read "$2"`
     >&2 echo "bytes read $br"
     bw=`trace_bytes_written "$2"`
     >&2 echo "bytes written $bw"
+    tt=`capture_reported_time "$2"`
+    fi
+    
     m=`trace_mem_usage "$2"`
     >&2 echo "mem usage $m"
     t=`trace_time "$2"`
-    tt=`capture_reported_time "$2"`
     echo $1,$br,$m,$bw,$t,$tt >> $RESULTSFILE
 }
+
+FULL_BENCHMARK=0
 
 echo "Converting models"
 
@@ -207,6 +220,8 @@ do
     trace "convert_to_hdt,$model,"   "$convert_to_hdt $model.nt $model.hdt"
     trace "convert_to_hdf5,$model,"  "$convert_to_hdf5 $model.ifc $model.hdf5"
 done
+
+FULL_BENCHMARK=1
 
 echo "Executing queries"
 

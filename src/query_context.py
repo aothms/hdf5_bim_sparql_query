@@ -122,7 +122,7 @@ class query_context(object):
         if output is None: output = sys.stdout
         vars = [self.vars.index(str(v)) for v in self.proj]
         for v in self:
-            print(" ".join(v[n] for n in vars), file=output)
+            print(" ".join(str(v[n]) for n in vars), file=output)
         
     def __repr__(self, table=False):
         b = StringIO()
