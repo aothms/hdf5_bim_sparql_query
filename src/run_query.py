@@ -9,7 +9,7 @@ import population
 
 VERBOSE = "-v" in sys.argv
 if VERBOSE: 
-    sys.args.remove("-v")
+    sys.argv.remove("-v")
 
 print_section = lambda s,q: (print("\n"+s), print('-'*len(s)), print(q))
 
