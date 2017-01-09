@@ -1,4 +1,4 @@
-printf "This script executes and compares sparql queries on building models.\n"
+echo "This script executes and compares sparql queries on building models."
 read -n 1 -s -p "Press any key to continue...
 "
 
@@ -13,7 +13,7 @@ export CFLAGS="-O3 -march=native"
 export CXXFLAGS="-O3 -march=native"
 
 
-printf "Checking prerequisites\n"
+echo "Checking prerequisites"
 for pkg in oracle-java8-installer g++ make maven git zip unzip
 do
 dpkg -s $pkg &> /dev/null && continue
@@ -23,18 +23,16 @@ echo "sudo apt-get update"
 echo "sudo apt-get install oracle-java8-installer g++ make maven git zip unzip python-pip"
 echo "sudo python -m pip install --upgrade pip"
 echo "sudo python -m pip install h5py==2.7.0rc2 pyparsing rdflib"
-exit 1
 done
 
 
-printf "Obtaining jena\n"
+echo "Obtaining jena"
 cd $BUILDPATH
 wget -qq http://apache.mirror.triple-it.nl/jena/binaries/apache-jena-3.1.1.tar.gz
 tar -xf apache-jena-3.1.1.tar.gz
 
-exit 0
 
-printf "Obtaining and building IFC to RDF\n"
+echo "Obtaining and building IFC to RDF"
 cd $BUILDPATH
 git clone -q https://github.com/mmlab/IFC-to-RDF-converter
 cd IFC-to-RDF-converter/
@@ -49,22 +47,22 @@ cd data/
 zip -qvu ../IFC-to-RDF-converter.jar * &> /dev/null
 
 
-printf "Obtaining and building rdf3x\n"
+echo "Obtaining and building rdf3x"
 cd $BUILDPATH
 git clone -q https://github.com/gh-rdf3x/gh-rdf3x
 cd gh-rdf3x
-patch -p0 < $SCRIPTPATH/patches/rdf3xquery.diff
+patch -p1 < $SCRIPTPATH/patches/rdf3xquery.diff
 make -j &> /dev/null
 
 
-printf "Obtaining and building hdt\n"
+echo "Obtaining and building hdt"
 cd $BUILDPATH
 git clone -q https://github.com/rdfhdt/hdt-java
 cd hdt-java
 mvn -q package &> /dev/null
 
 
-printf "Building ARQ query executor"
+echo "Building ARQ query executor"
 cd $BUILDPATH
 mkdir arq_query
 cd arq_query
@@ -77,7 +75,7 @@ echo "$(find ../hdt-java/hdt-java-package/target/hdt-java-package-2.0-distributi
 jar cvfm arq_query.jar manifest.txt -C classes . &> /dev/null
 
 
-printf "Obtaining and building IfcOpenShell with HDF5 support\n"
+echo "Obtaining and building IfcOpenShell with HDF5 support"
 cd $BUILDPATH
 wget -qq http://downloads.sourceforge.net/project/boost/boost/1.63.0/boost_1_63_0.tar.gz
 tar -xf boost_1_63_0.tar.gz
@@ -105,7 +103,7 @@ cp $SCRIPTPATH/hdf5_convert/hdf5_convert.cpp main.cpp
 g++ -O3 -march=native -o ../../bin/ifc_hdf5_convert -DBOOST_OPTIONAL_USE_OLD_DEFINITION_OF_NONE -std=c++11 -I$BUILDPATH/boost_1_63_0/ -I$BUILDPATH/hdf5-1.8.18/hdf5/include main.cpp ../ifcparse/*.cpp $BUILDPATH/zlib-1.2.10/libz.a $BUILDPATH/hdf5-1.8.18/hdf5/lib/libhdf5_cpp.a $BUILDPATH/hdf5-1.8.18/hdf5/lib/libhdf5.a -ldl
 
 
-printf "Obtaining test files\n"
+echo "Obtaining test files"
 cd $SCRIPTPATH
 mkdir files
 cd files
@@ -197,7 +195,7 @@ function trace() {
     echo $1,$br,$m,$bw,$t,$tt >> $RESULTSFILE
 }
 
-printf "Converting models\n"
+echo "Converting models"
 
 for model in duplex clinic office riverside
 do
@@ -210,7 +208,7 @@ do
     trace "convert_to_hdf5,$model,"  "$convert_to_hdf5 $model.ifc $model.hdf5"
 done
 
-printf "Executing queries\n"
+echo "Executing queries"
 
 for model in duplex clinic office riverside
 do
