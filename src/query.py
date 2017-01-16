@@ -74,7 +74,8 @@ class path(object):
                     assert pp.mod == '*', "Path root second node should be a multiplication of next"
                     
             self.list_accessor = True
-            self.list_range = (min_elem, max_elem)
+            # +1 to account for python slice() syntax
+            self.list_range = (min_elem, max_elem + 1)
 
 class query(object):
 
@@ -126,13 +127,13 @@ class query(object):
             varnames_c = ",".join("?%s" % v for v in self.vars)
             
             if all(is_var): 
-                self.fn = lambda t: opfn(getattr(t, s0).value, getattr(t, s1).value)
+                self.fn = lambda t: opfn(getattr(t, s0), getattr(t, s1))
                 self.s = "F(%s) -> {0,1} { ?%s %s ?%s }" % (varnames_c, s0, expr.op, s1)
             elif is_var[0]:
-                self.fn = lambda t: opfn(getattr(t, s0).value, a1)
+                self.fn = lambda t: opfn(getattr(t, s0), a1)
                 self.s = "F(%s) -> {0,1} { ?%s %s %.2f }" % (varnames_c, s0, expr.op, a1)
             elif is_var[1]:
-                self.fn = lambda t: opfn(a0, getattr(t, s1).value)
+                self.fn = lambda t: opfn(a0, getattr(t, s1))
                 self.s = "F(%s) -> {0,1} { %.2f %s ?%s }" % (varnames_c, a0, expr.op, s1)
             else: raise Exception("Not supported")
             

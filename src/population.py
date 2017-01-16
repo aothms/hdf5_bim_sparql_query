@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import sys
+import h5py
 import time
 import numpy
 import numbers
@@ -53,7 +54,8 @@ class population(object):
 
     class cached_group_reference(object):
     
-        """Makes sure a dataset is read only once and in its entirity"""
+        """Makes sure a dataset is read only once and in 
+           its entirity, unless it is very big"""
     
         def __init__(self, g):
             self.g = g
@@ -65,10 +67,16 @@ class population(object):
             v2 = [v, v.shape, v.dtype, None]
             self.c[k] = v2
             return v.shape, v.dtype
+        @profile
         def data(self, k):
             v = self.c.get(k)
             if v[3] is not None: return v[3]
-            v[3] = v[0][:]
+            if v[1][0] > 1000000:
+                # print("Lazy loading", k, file=sys.stderr)
+                v[3] = v[0]
+            else:
+                # print("Fetching", k, file=sys.stderr)
+                v[3] = v[0][:]
             return v[3]
 
     def __init__(self, f):
@@ -89,22 +97,34 @@ class population(object):
         return hdf5_instance_reference(self, dsid, instid)
     
     @profile
-    def format(self, is_ref, ob): #, enum=None, vlen=None):
+    def format(self, is_ref, ob, list_range=None): #, enum=None, vlen=None):
         tob = type(ob)
     
-        if tob == rdflib.term.Literal:
-            # sparql literals are not converted to the appropriate type by rdflib
-            # TODO: Find better numeral matching method then based on ttl format string.
-            # TODO: Or is there a datatype associated with the literal?
-            try: ob = int(ob)
-            except:
-                try: ob = float(ob)
-                except: ob = str(ob)
-            tob = type(ob)
-        
-        if tob == numpy.ndarray:
+        if is_ref:
+            yield hdf5_instance_reference(self, ob[0], ob[1])
+        elif tob in (str, unicode, numpy.string_):
+            yield u'"%s"' % ob.replace('"', '')
+        # Below slower inheritance checking?
+        # elif isinstance(ob, (numpy.integer, numbers.Integral)):
+        #     print(tob.__name__, file=sys.stderr)
+        #     yield ob
+        # elif tob in (numpy.int8, int):
+        #     # if enum:
+        #     #     # TODO: Performance
+        #     #     return "ifc:" + dict(zip(enum.values(), enum.keys()))[ob]
+        #     # else:
+        #     yield ob
+        #     # yield rdflib.term.Literal(ob, datatype="xsd:integer")
+        # elif isinstance(ob, (numpy.float, numbers.Real)):
+        #     print(tob.__name__, file=sys.stderr)
+        #     yield ob
+        #     # yield rdflib.term.Literal(ob, datatype="xsd:double")
+        # Hackhackhack a bit faster, covers both numpy as well as python datatypes
+        elif tob.__name__.startswith("int") or tob.__name__.startswith("float"):
+            yield ob
+        elif tob == numpy.ndarray:
             # print(tob, ob, file=sys.stderr)
-            for x in ob:
+            for x in ob[slice(*list_range)]:
                 for y in self.format(is_ref, x): yield y
             # q  = map(functools.partial(self.format, is_ref), ob)
             # return q            
@@ -118,20 +138,18 @@ class population(object):
                 self.list_index += 1
                 return list_uri
             """
-        elif is_ref:
-            yield hdf5_instance_reference(self, ob[0], ob[1])
-        elif tob in (str, unicode, numpy.string_):
-            yield u'"%s"' % ob.replace('"', '')
-        # Below slower inheritance checking?
-        elif isinstance(ob, (numpy.integer, numbers.Integral)):
-        # elif tob in (numpy.int8, int):
-            # if enum:
-            #     # TODO: Performance
-            #     return "ifc:" + dict(zip(enum.values(), enum.keys()))[ob]
-            # else:
-            yield rdflib.term.Literal(ob, datatype="xsd:integer")
-        elif isinstance(ob, (numpy.float, numbers.Real)):
-            yield rdflib.term.Literal(ob, datatype="xsd:double")
+        elif tob == rdflib.term.Literal:
+            # This doesn't seem to occur anymore
+            
+            # sparql literals are not converted to the appropriate type by rdflib
+            # TODO: Find better numeral matching method then based on ttl format string.
+            # TODO: Or is there a datatype associated with the literal?
+            try: ob = int(ob)
+            except:
+                try: ob = float(ob)
+                except: ob = str(ob)
+            tob = type(ob)
+        
         else:
             print (type(ob), ob, file=sys.stderr)
             raise Exception("Bleh")
@@ -269,9 +287,11 @@ class population(object):
             
             # To enumerate instances and their types we do not even need to open the dataset, shape is sufficient
             if pred_isa or triplefilter is None:
+                rdf_type = RDF.type
+                ifc_nm = "ifc:%s" % nm
                 for instid in range(ds_shape[0]):
                     subj = self.format_ref(dsid, instid)
-                    yield subj, RDF.type, "ifc:%s" % nm
+                    yield subj, rdf_type, ifc_nm
                     
                 # If filter is not None this means we are filtering on rdf:type no IFC entity attribute can ever fulfil that, so its safe to continue
                 if triplefilter is not None: 
@@ -290,14 +310,25 @@ class population(object):
             is_instance_ref = map(lambda f: f == self.instance_reference_type or (f.metadata and 'vlen' in f.metadata and f.metadata['vlen'] == self.instance_reference_type), dts)
             
             ds_data = self.population.data(nm + "_instances")
-            ds_data_enum = enumerate(ds_data)
+            lazy = type(ds_data) == h5py.Dataset
+            if not lazy:
+                ds_data_enum = enumerate(ds_data)
             if filter_values and not isinstance(filter_values[0], rdflib.term.Variable):
                 if isinstance(filter_values[0], set):
                     subs_in_ds = filter(lambda x: x.dsid == dsid, filter_values[0])
                     inst_ids = set(map(operator.attrgetter('instid'), subs_in_ds))
                 else:
                     raise Exception("I did not expect a single URI reference as subject")
-                ds_data_enum = filter(lambda a: a[0] in inst_ids, ds_data_enum)
+                # print(inst_ids, file=sys.stderr)
+                
+                if lazy:
+                    # TODO, stop encoding this in hashsets, use ranges and binary search sorted lists?
+                    sorted_inst_ids = sorted(inst_ids)
+                    ds_data_enum = itertools.izip(sorted_inst_ids, ds_data[sorted_inst_ids])
+                else:
+                    ds_data_enum = ((i, ds_data[i]) for i in inst_ids)
+                    # What was I thinking here:
+                    # ds_data_enum = filter(lambda a: a[0] in inst_ids, ds_data_enum)
 
             num_attrs = schema.num_attributes[nm]
             
@@ -336,15 +367,16 @@ class population(object):
                         # This does not seem to work.
                         # m = dt.metadata or {}
                         
-                        if list_range:
-                            for n, v in enumerate(self.format(is_ref, v)):
-                                if n >= list_range[0] and n <= list_range[1] and match_ob_fn(v):
-                                    # import inspect
-                                    # print ("using lambda at:", match_ob_fn.func_code.co_firstlineno)
-                                    # exit()
-                                    yield subj, "ifc:" + (schema.attr_dict[nm][ds_names[i]]), v
-                        else:
-                            for v in self.format(is_ref, v): #, **m):
+                        # if list_range:
+                        #     for n, v in enumerate(self.format(is_ref, v)):
+                        #         if n >= list_range[0] and n < list_range[1] and match_ob_fn(v):
+                        #             # import inspect
+                        #             # print ("using lambda at:", match_ob_fn.func_code.co_firstlineno)
+                        #             # exit()
+                        #             yield subj, "ifc:" + (schema.attr_dict[nm][ds_names[i]]), v
+                        # else:
+                        if True:
+                            for v in self.format(is_ref, v, list_range=list_range): #, **m):
                             
                                 """
                                 if match_ob is not None:

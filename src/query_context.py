@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import sys
+import array
 import operator
 import itertools
 import functools
@@ -188,6 +189,47 @@ class query_context(object):
     def intersect(self, a, b, keys):
         itemsgetter = lambda ks: lambda v: tuple(v[i] for i in ks)
         g = itemsgetter(keys)
+        
+        # Decorate-undecorate proved to be slower than re-executing g
+        # augment = lambda t: (g(t), t)
+        # A = sorted(augment(x) for x in a)
+        # B = sorted(augment(x) for x in b)
+        # Ag = itertools.groupby(A, operator.itemgetter(0))
+        # Bg = itertools.groupby(B, operator.itemgetter(0))
+        
+        A = sorted(a, key=g)
+        B = sorted(b, key=g)
+        Ag = itertools.groupby(A, g)
+        Bg = itertools.groupby(B, g)
+        
+        r = []
+        
+        new = tuple.__new__
+        T = self.t
+        
+        try:       
+         
+            Ak, Ats = next(Ag)
+            Bk, Bts = next(Bg)
+            while True:
+                if Ak == Bk:
+                    for x, y in itertools.product(Ats, Bts):
+                        # r.append(self.make_tuple1(x, y))
+                        r.append(new(T, map(lambda _a, _b: _b if _a is None else _a, x, y)))
+                    Ak, Ats = next(Ag)
+                    Bk, Bts = next(Bg)
+                elif Ak < Bk:
+                    Ak, Ats = next(Ag)
+                else:
+                    Bk, Bts = next(Bg)
+                    
+        except StopIteration as e:
+            pass
+        
+        return r
+        
+        # Naive join implementation below
+
 
         # Fixed: here duplicates are merged
         # a_subset = dict(zip(map(g, a), a))
@@ -294,17 +336,54 @@ class query_context(object):
             raise Exception("Not implemented")
      
     @profile     
-    def feed(self, filter, triples):
+    def feed(self, filter_, triples):
     
-        is_var = tuple(isinstance(x, Variable) for x in filter)
-        names = tuple(b for a, b in zip(is_var, filter) if a)
+        is_var = tuple(isinstance(x, Variable) for x in filter_)
+        names = tuple(b for a, b in zip(is_var, filter_) if a)
         is_var_idxs = [a for a, b in enumerate(is_var) if b]
         
         names = map(self.varnames.get, map(str, names))
+        inames = iter(names)
         
+        new = tuple.__new__
+        T = self.t
+        N = len(T._fields)
+        
+        variable_to_triple_position = map( (lambda v, i: (next(inames), i) if v else (None, None)), is_var, range(3))
+        variable_to_triple_position = filter( lambda vs: filter( lambda vs2: vs2 is not None, vs), variable_to_triple_position )
+
+        # variable_to_triple_position = dict(map( (lambda v, i: (next(inames), i) if v else (None, None)), is_var, range(3)))
+        # variable_to_triple_position = array.array('i', map(lambda i: variable_to_triple_position.get(i, -1), range(N)))
+
         # Quicker than map
         fn = self.make_tuple2
-        x = [fn(is_var, names, t) for t in triples]
+        
+        # triples = list(triples)
+        # print(is_var, names)
+        # print(variable_to_triple_position)
+        # print(triples[0])
+
+        @profile
+        def tuple_contents(t):
+            vs = [None] * N
+            for vpos, tpos in variable_to_triple_position:
+                vs[vpos] = t[tpos]
+            return vs
+            
+            #     for i in range(N):
+            #         p = variable_to_triple_position[i]
+            #         if p == -1: yield None
+            #         else: yield t[p]
+
+        @profile
+        def make_tuple2(t):
+            return new(T, tuple_contents(t))
+        
+        # make_tuple2 = lambda t: new(T, [ t[variable_to_triple_position[i]] if variable_to_triple_position.get(i) is not None else None     for i in range(N) ])
+        # print(make_tuple2(triples[0]))
+
+        # x = [fn(is_var, names, t) for t in triples]
+        x = [new(T, tuple_contents(t)) for t in triples]
         # x = map(functools.partial(self.make_tuple2, is_var, names), triples)
                 
         if len(names) == 0 or len(names) == 3:
