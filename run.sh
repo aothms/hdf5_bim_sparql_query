@@ -104,6 +104,15 @@ cp $SCRIPTPATH/hdf5_convert/hdf5_convert.cpp main.cpp
 g++ -O3 -march=native -o ../../bin/ifc_hdf5_convert -DBOOST_OPTIONAL_USE_OLD_DEFINITION_OF_NONE -std=c++11 -I$BUILDPATH/boost_1_63_0/ -I$BUILDPATH/hdf5-1.8.18/hdf5/include main.cpp ../ifcparse/*.cpp $BUILDPATH/zlib-1.2.10/libz.a $BUILDPATH/hdf5-1.8.18/hdf5/lib/libhdf5_cpp.a $BUILDPATH/hdf5-1.8.18/hdf5/lib/libhdf5.a -ldl
 
 
+echo "Obtaining IfcOpenShell-python"
+cd $BUILDPATH
+wget -qq -O ifcopenshell-python.zip wget http://sourceforge.net/projects/ifcopenshell/files/0.5.0-preview1/ifcopenshell-python-2.7-0.5.0-preview1-linux64.zip/download
+unzip -qq ifcopenshell-python.zip
+PYTHON_MODULE_DIR=`python -c "import site; print site.getusersitepackages()"`
+mkdir -p $PYTHON_MODULE_DIR
+mv ifcopenshell $PYTHON_MODULE_DIR
+
+
 echo "Obtaining test files"
 cd $SCRIPTPATH
 mkdir files
@@ -243,4 +252,13 @@ do
     
     cd $SCRIPTPATH/files
     du -ad1 duplex office clinic riverside > ../filesizes.txt
+done
+
+
+for model in duplex clinic office riverside
+do
+    cd $SCRIPTPATH/files/$model
+    # This is an horribly slow way to calculate the amount of instances, but it is the only thing the preview1 wrapper provided
+    NUM_INSTANCES=`python -c "import ifcopenshell; f = ifcopenshell.open('$model.ifc'); print len(f.wrapped_data.entity_names())"`
+    echo $model,$NUM_INSTANCES >> ../../../instances.csv
 done
