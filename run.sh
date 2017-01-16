@@ -240,4 +240,7 @@ do
         trace "query_rdf3x,$model,`basename $query`" "$query_rdf3x $model.rdf3x $query.expanded"
         trace "query_hdf5,$model,`basename $query`" "$query_hdf5 $model.hdf5 $query"
     done
+    
+    cd $SCRIPTPATH/files
+    du -ad1 duplex office clinic riverside > ../filesizes.txt
 done
