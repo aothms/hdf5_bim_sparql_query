@@ -260,5 +260,5 @@ do
     cd $SCRIPTPATH/files/$model
     # This is an horribly slow way to calculate the amount of instances, but it is the only thing the preview1 wrapper provided
     NUM_INSTANCES=`python -c "import ifcopenshell; f = ifcopenshell.open('$model.ifc'); print len(f.wrapped_data.entity_names())"`
-    echo $model,$NUM_INSTANCES >> ../../../instances.csv
+    echo $model,$NUM_INSTANCES >> ../../instances.csv
 done

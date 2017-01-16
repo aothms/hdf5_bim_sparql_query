@@ -97,13 +97,17 @@ class population(object):
         return hdf5_instance_reference(self, dsid, instid)
     
     @profile
-    def format(self, is_ref, ob, list_range=None): #, enum=None, vlen=None):
+    def format(self, is_ref, ob, list_range=[None]): #, enum=None, vlen=None):
         tob = type(ob)
     
-        if is_ref:
+        if tob == numpy.ndarray:
+            # print(tob, ob, file=sys.stderr)
+            for x in ob[slice(*list_range)]:
+                for y in self.format(is_ref, x): yield y
+        elif is_ref:
             yield hdf5_instance_reference(self, ob[0], ob[1])
         elif tob in (str, unicode, numpy.string_):
-            yield u'"%s"' % ob.replace('"', '')
+            yield ob
         # Below slower inheritance checking?
         # elif isinstance(ob, (numpy.integer, numbers.Integral)):
         #     print(tob.__name__, file=sys.stderr)
@@ -122,10 +126,6 @@ class population(object):
         # Hackhackhack a bit faster, covers both numpy as well as python datatypes
         elif tob.__name__.startswith("int") or tob.__name__.startswith("float"):
             yield ob
-        elif tob == numpy.ndarray:
-            # print(tob, ob, file=sys.stderr)
-            for x in ob[slice(*list_range)]:
-                for y in self.format(is_ref, x): yield y
             # q  = map(functools.partial(self.format, is_ref), ob)
             # return q            
             """
@@ -139,8 +139,8 @@ class population(object):
                 return list_uri
             """
         elif tob == rdflib.term.Literal:
-            # This doesn't seem to occur anymore
-            
+            # This occurs when an object is matched directly against a literal in the basic graph pattern
+            # 
             # sparql literals are not converted to the appropriate type by rdflib
             # TODO: Find better numeral matching method then based on ttl format string.
             # TODO: Or is there a datatype associated with the literal?
@@ -149,7 +149,7 @@ class population(object):
                 try: ob = float(ob)
                 except: ob = str(ob)
             tob = type(ob)
-        
+            yield ob
         else:
             print (type(ob), ob, file=sys.stderr)
             raise Exception("Bleh")
@@ -204,7 +204,7 @@ class population(object):
         datasets_included_explicitly = None
         pred_name = None
         pred_isa = False
-        list_range = None
+        list_range = [None]
         
         if triplefilter:
             get_from_context = lambda v: context.get(v, v)

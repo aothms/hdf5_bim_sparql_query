@@ -131,10 +131,10 @@ class query(object):
                 self.s = "F(%s) -> {0,1} { ?%s %s ?%s }" % (varnames_c, s0, expr.op, s1)
             elif is_var[0]:
                 self.fn = lambda t: opfn(getattr(t, s0), a1)
-                self.s = "F(%s) -> {0,1} { ?%s %s %.2f }" % (varnames_c, s0, expr.op, a1)
+                self.s = "F(%s) -> {0,1} { ?%s %s %s }" % (varnames_c, s0, expr.op, a1)
             elif is_var[1]:
                 self.fn = lambda t: opfn(a0, getattr(t, s1))
-                self.s = "F(%s) -> {0,1} { %.2f %s ?%s }" % (varnames_c, a0, expr.op, s1)
+                self.s = "F(%s) -> {0,1} { %s %s ?%s }" % (varnames_c, a0, expr.op, s1)
             else: raise Exception("Not supported")
             
             
