@@ -10,12 +10,12 @@ WHERE {
     ?guid_box express:hasString ?guid .
     ?o ifc:objectPlacement_IfcProduct ?p .
     ?p ifc:relativePlacement_IfcLocalPlacement ?a .
-    ?a ifc:location_IfcPlacement ?c .
-    ?c ifc:coordinates_IfcCartesianPoint ?coords_0 .
+    ?a ifc:axis_IfcAxis2Placement3D ?c .
+    ?c ifc:directionRatios_IfcDirection ?coords_0 .
     ?coords_0 list:hasNext ?coords_1 .
     ?coords_1 list:hasNext ?coords_2 .
     ?coords_2 list:hasContents ?z_box .
     ?z_box express:hasDouble ?z .
-    FILTER (?z = "0.0"^^xsd:double)
+    FILTER (?z = "1.0"^^xsd:double)
 }
 ORDER BY ASC(?guid)

@@ -4,6 +4,6 @@ PREFIX express:  <https://w3id.org/express#>
 SELECT ?window ?height
 WHERE {
     ?window a ifc:IfcWindow .
-    ?window ifc:overallHeight_IfcWindow ?height_ .
-    ?height_ express:hasDouble ?height
+    ?window ifc:overallHeight_IfcWindow ?height_box .
+    ?height_box express:hasDouble ?height
 }
