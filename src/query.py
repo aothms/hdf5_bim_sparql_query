@@ -203,12 +203,16 @@ class query(object):
             return iter(self.spo)
             
     def merge_paths(self):
-        merged = True
-        def statement_by_object(O):
+        
+        def statement_by_x(index, X):
             for x in self.statements:
                 if isinstance(x, query.triple):
-                    s,p,o = x
-                    if o == O: yield x
+                    if tuple(x)[index] == X: yield x
+                    
+        statement_by_subject = functools.partial(statement_by_x, 0)
+        statement_by_object = functools.partial(statement_by_x, 2)
+                    
+        merged = True
         while merged:
             merged = False
             for x in self.statements:
@@ -217,19 +221,33 @@ class query(object):
                     if not isinstance(p, Path):
                         if p.startswith(prefixes.EXPRESS) or p.startswith(prefixes.LIST):
                             S = list(statement_by_object(s))
-                            # print(s, S)
-                            assert len(S) == 1
-                            s2,p2,o2 = S[0]
-                            if isinstance(p2, SequencePath):
-                                # mutable
-                                p2.args.append(p)
-                                self.statements.append(query.triple(self, (s2, p2, o)))
-                            else:
-                                self.statements.append(query.triple(self, (s2, SequencePath(p2, p), o)))
-                                # print(S[0], x)
-                                # print(self.statements[-1])
-                            self.statements.remove(S[0])
-                            self.statements.remove(x)
+                            # assert len(S) == 1
+                            to_append, to_remove = [], []
+                            for s2p2o2 in S:
+                                s2, p2, o2 = s2p2o2
+                                if isinstance(p2, SequencePath):
+                                    # mutable
+                                    p2.args.append(p)
+                                    to_append.append(query.triple(self, (s2, p2, o)))
+                                else:
+                                    to_append.append(query.triple(self, (s2, SequencePath(p2, p), o)))
+                                if list(statement_by_subject(o2)) == [x]:
+                                    to_remove.append(s2p2o2)
+                                else:
+                                    pass
+                                    # print("Not removing", s2p2o2, "because of", list(statement_by_subject(o2)))
+                                to_remove.append(x)
+                                
+                            # print("old\n---")
+                            # print(self)
+                                
+                            self.statements.extend(to_append)
+                            for tr in to_remove:
+                                self.statements.remove(tr)
+                                
+                            # print("new\n---")
+                            # print(self)
+                                
                             merged = True
                             break
             
