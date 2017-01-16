@@ -253,6 +253,7 @@ class query(object):
                         pred_name = pred_name[0].upper() + pred_name[1:]
                         attribute_is_list = (pred_name_entity, pred_name) in schema.list_attributes
                         attribute_is_boxed = (pred_name_entity, pred_name) in schema.wrapped_attributes
+                        if attribute_is_list: attribute_is_boxed = True
                     
                     if isinstance(p, Path):                
                         p = path(p, is_list=attribute_is_list, is_boxed=attribute_is_boxed)                   
