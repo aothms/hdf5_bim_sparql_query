@@ -120,12 +120,14 @@ wget -qq -O duplex.zip http://projects.buildingsmartalliance.org/files/?artifact
 wget -qq -O office.zip http://projects.buildingsmartalliance.org/files/?artifact_id=4284
 wget -qq -O clinic.zip http://projects.buildingsmartalliance.org/files/?artifact_id=4289
 wget -qq -O riverside.zip http://download2cf.nemetschek.net/www_misc/bim/DCR-LOD_300.zip
+wget -qq -O schependomlaan.ifc https://github.com/openBIMstandards/DataSetSchependomlaan/raw/master/Design%20model%20IFC/IFC%20Schependomlaan.ifc
 unzip -qq "*.zip"
-mkdir duplex clinic office riverside
+mkdir duplex clinic office riverside schependomlaan
 mv Duplex_A_20110907_optimized.ifc duplex/duplex.ifc
 mv Office_A_20110811.ifc office/office.ifc
 mv Clinic_MEP_20110906_optimized.ifc clinic/clinic.ifc
 mv Architectural/DC_Riverside_Bldg-LOD_300.ifc riverside/riverside.ifc
+mv schependomlaan.ifc schependomlaan/schependomlaan.ifc
 
 
 
