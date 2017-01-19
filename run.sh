@@ -80,18 +80,17 @@ echo "Obtaining and building IfcOpenShell with HDF5 support"
 cd $BUILDPATH
 wget -qq http://downloads.sourceforge.net/project/boost/boost/1.63.0/boost_1_63_0.tar.gz
 tar -xf boost_1_63_0.tar.gz
-wget -qq http://www.zlib.net/zlib-1.2.10.tar.gz
-tar -xf zlib-1.2.10.tar.gz
-cd zlib-1.2.10/
-./configure &> /dev/null
-make -j &> /dev/null
+wget -qq https://downloads.sourceforge.net/project/libpng/zlib/1.2.11/zlib-1.2.11.tar.gz
+tar -xf zlib-1.2.11.tar.gz
+cd zlib-1.2.11/
+./configure --prefix=$BUILDPATH/zlib-1.2.11/install &> /dev/null
+make -j install &> /dev/null
 cd $BUILDPATH
 wget -qq https://support.hdfgroup.org/ftp/HDF5/current18/src/hdf5-1.8.18.tar.gz
 tar -xf hdf5-1.8.18.tar.gz
 cd hdf5-1.8.18/
-./configure --enable-cxx --enable-production --with-zlib=$BUILDPATH/zlib-1.2.10  &> /dev/null
+./configure --enable-cxx --enable-production --with-zlib=$BUILDPATH/zlib-1.2.11/install &> /dev/null
 make -j install &> /dev/null
-echo "#define H5_HAVE_FILTER_DEFLATE 1" >> $BUILDPATH/hdf5-1.8.18/hdf5/include/H5pubconf.h
 cd $BUILDPATH
 git clone -q https://github.com/ISBE-TUe/IfcOpenShell-HDF5
 cd IfcOpenShell-HDF5
@@ -101,7 +100,7 @@ cd src
 mkdir hdf5_convert
 cd hdf5_convert
 cp $SCRIPTPATH/hdf5_convert/hdf5_convert.cpp main.cpp
-g++ -O3 -march=native -o ../../bin/ifc_hdf5_convert -DBOOST_OPTIONAL_USE_OLD_DEFINITION_OF_NONE -std=c++11 -I$BUILDPATH/boost_1_63_0/ -I$BUILDPATH/hdf5-1.8.18/hdf5/include main.cpp ../ifcparse/*.cpp $BUILDPATH/zlib-1.2.10/libz.a $BUILDPATH/hdf5-1.8.18/hdf5/lib/libhdf5_cpp.a $BUILDPATH/hdf5-1.8.18/hdf5/lib/libhdf5.a -ldl
+g++ -O3 -march=native -o ../../bin/ifc_hdf5_convert -DBOOST_OPTIONAL_USE_OLD_DEFINITION_OF_NONE -std=c++11 -I$BUILDPATH/boost_1_63_0/ -I$BUILDPATH/hdf5-1.8.18/hdf5/include main.cpp ../ifcparse/*.cpp $BUILDPATH/hdf5-1.8.18/hdf5/lib/libhdf5_cpp.a $BUILDPATH/hdf5-1.8.18/hdf5/lib/libhdf5.a -ldl $BUILDPATH/zlib-1.2.11/install/lib/libz.a
 
 
 echo "Obtaining IfcOpenShell-python"
