@@ -165,7 +165,8 @@ class query(object):
             is_unknown_variable = lambda v: v not in known_variables and isinstance(v, (Variable, BNode))
             fns = [
                 # Triples with unknown variables are pushed to the back
-                (lambda spo: len(filter(is_unknown_variable, spo))),
+                # Recent addition, extra penalty on o
+                (lambda spo: len(filter(is_unknown_variable, spo)) + is_unknown_variable(spo[2])),
                 
                 # Variables with many references are pushed to the front
                 # This is detrimental in our tests

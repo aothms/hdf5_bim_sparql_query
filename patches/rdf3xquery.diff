@@ -54,7 +54,7 @@ index 6539bd1..d762f69 100755
 +   
 +   cerr.setf(ios::fixed,ios::floatfield);
 +   cerr.precision(3);
-+   cerr << "Parse time: " << time_diff(tp0, tp1) << " secs" << endl;
-+   cerr << "Query time: " << time_diff(tq0, tq1) << " secs" << endl;
++   cerr << "Parse time: " << time_diff(tp0, tp1) << " sec" << endl;
++   cerr << "Query time: " << time_diff(tq0, tq1) << " sec" << endl;
  }
  //---------------------------------------------------------------------------

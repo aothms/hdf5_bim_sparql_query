@@ -129,12 +129,18 @@ mv Clinic_MEP_20110906_optimized.ifc clinic/clinic.ifc
 mv Architectural/DC_Riverside_Bldg-LOD_300.ifc riverside/riverside.ifc
 mv schependomlaan.ifc schependomlaan/schependomlaan.ifc
 
+echo "Everything setup, you are advised to run the script with taskset -c 0 /bin/bash run.sh"
+read -n 1 -s -p "Press any key to continue...
+"
 
 
 touch $BUILDPATH/setup
 fi
 
+
 MEM=`grep MemTotal /proc/meminfo | awk '{print int($2/1000000)}'`
+export JAVA_OPTIONS=-Xmx${MEM}g
+
 echo "JVM_ARGS=-Xmx${MEM}g $BUILDPATH"'/apache-jena-3.1.1/bin/riot --out=nt $1 > $2' > $BUILDPATH/riot.sh
 echo "JVM_ARGS=-Xmx${MEM}g $BUILDPATH"'/apache-jena-3.1.1/bin/sparql --data=$1 --query=$2' > $BUILDPATH/query_jena.sh
 echo "java -Xmx${MEM}g -jar $BUILDPATH"'/arq_query/arq_query.jar $1 $2' > $BUILDPATH/query_arq.sh
@@ -144,7 +150,7 @@ convert_to_rdf="java -Xmx${MEM}g -jar $BUILDPATH/IFC-to-RDF-converter/converter/
 convert_to_nt="/bin/sh $BUILDPATH/riot.sh"
 convert_to_rdf3x="$BUILDPATH/gh-rdf3x/bin/rdf3xload"
 convert_to_tdb="$BUILDPATH/apache-jena-3.1.1/bin/tdbloader -loc"
-convert_to_hdt="$BUILDPATH/hdt-java/hdt-java-package/target/hdt-java-package-2.0-distribution/hdt-java-package-2.0/bin/rdf2hdt.sh"
+convert_to_hdt="$BUILDPATH/hdt-java/hdt-java-package/target/hdt-java-package-2.0-distribution/hdt-java-package-2.0/bin/rdf2hdt.sh -index"
 convert_to_hdf5="$BUILDPATH/IfcOpenShell-HDF5/bin/ifc_hdf5_convert"
 
 query_jena="/bin/sh $BUILDPATH/query_jena.sh"
@@ -152,6 +158,12 @@ query_arq="/bin/sh $BUILDPATH/query_arq.sh"
 query_tdb="/bin/sh $BUILDPATH/query_tdb.sh"
 query_rdf3x="$BUILDPATH/gh-rdf3x/bin/rdf3xquery"
 query_hdf5="python $SCRIPTPATH/src/run_query.py"
+
+function wipe_cache() {
+    sync
+    echo 3 | sudo tee /proc/sys/vm/drop_caches
+    sleep 1
+}
 
 function trace_bytes_read() {
     strace -f -s0 -etrace=read $1 2>&1 >/dev/null | grep read | awk 'BEGIN {FS="="}{ sum += $2} END {print sum}'
@@ -172,7 +184,8 @@ function min_value() {
 function trace_time() {
     TIMEFORMAT="TIME=%3R,%3U,%3S"
     times=""
-    for i in 0 1 2; do
+    for i in 0 1 2 3 4; do
+        wipe_cache &>/dev/null
         t=$( { time $1 &>/dev/null ; } 2>&1 )
         >&2 echo "measured time [$i] (real, user, system) $t"
         times="$times `echo $t | grep TIME= | cut -c6-`"
@@ -185,7 +198,8 @@ function trace_time() {
 
 function capture_reported_time() {
     times=""
-    for i in 0 1 2; do
+    for i in 0 1 2 3 4; do
+        wipe_cache &>/dev/null
         results=`$1 2>&1 1>/dev/null`
         pt=`echo "$results" | grep "Parse time" | cut -c 13- | sed 's/....$//'`
         qt=`echo "$results" | grep "Query time" | cut -c 13- | sed 's/....$//'`
@@ -220,9 +234,12 @@ FULL_BENCHMARK=0
 
 echo "Converting models"
 
-for model in duplex clinic office riverside
+shopt -s extglob
+
+for model in duplex clinic office riverside schependomlaan
 do
     cd $SCRIPTPATH/files/$model
+    rm -rf !(*.ifc)
     trace "convert_to_rdf,$model,"   "$convert_to_rdf $model.ifc $model.ttl"
     trace "convert_to_nt,$model,"    "$convert_to_nt $model.ttl $model.nt"
     trace "convert_to_rdf3x,$model," "$convert_to_rdf3x $model.rdf3x $model.nt"
@@ -231,15 +248,24 @@ do
     trace "convert_to_hdf5,$model,"  "$convert_to_hdf5 $model.ifc $model.hdf5"
 done
 
+
+cd $SCRIPTPATH/files
+du -ad1 duplex office clinic riverside schependomlaan > ../filesizes.txt
+
 FULL_BENCHMARK=1
 
 echo "Executing queries"
 
-for model in duplex clinic office riverside
+for model in duplex clinic office riverside schependomlaan
 do
     cd $SCRIPTPATH/files/$model
-    for query in $SCRIPTPATH/queries/q*.txt
+    for query_template in $SCRIPTPATH/queries/q*.txt
     do 
+        # Expand templates
+        query=$query_template.guid
+        GUID=`grep $model $SCRIPTPATH/model_stats.csv | awk -F , '{print $4}'`
+        cat $query_template | sed "s/GUID/\"$GUID\"/" > $query
+        
         python $SCRIPTPATH/src/query_expand.py $query $query.expanded
         trace "query_jena_nt,$model,`basename $query`" "$query_arq $model.nt $query"
         # trace "query_jena_official_nt,$model,`basename $query`" "$query_jena $model.nt $query"
@@ -250,9 +276,6 @@ do
         trace "query_rdf3x,$model,`basename $query`" "$query_rdf3x $model.rdf3x $query.expanded"
         trace "query_hdf5,$model,`basename $query`" "$query_hdf5 $model.hdf5 $query"
     done
-    
-    cd $SCRIPTPATH/files
-    du -ad1 duplex office clinic riverside > ../filesizes.txt
 done
 
 
