@@ -1,0 +1,10 @@
+PREFIX ifc: <http://ifcowl.openbimstandards.org/IFC2X3_TC1#>
+
+SELECT ?w
+WHERE {
+    ?w a ifc:IfcWallStandardCase .
+    FILTER NOT EXISTS {
+        ?rel a ifc:IfcRelVoidsElement .
+        ?rel ifc:RelatingBuildingElement_IfcRelVoidsElement ?w .
+    }
+}

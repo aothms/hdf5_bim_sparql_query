@@ -1,0 +1,11 @@
+PREFIX ifc: <http://ifcowl.openbimstandards.org/IFC2X3_TC1#>
+PREFIX express:  <https://w3id.org/express#>
+
+SELECT ?p ?name
+WHERE {
+    ?p a ifc:IfcPerson .
+    OPTIONAL {
+        ?p ifc:givenName_IfcPerson ?name_box .
+        ?name_box express:hasString ?name .
+    }
+}
