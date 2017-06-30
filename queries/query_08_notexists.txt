@@ -1,10 +1,14 @@
 PREFIX ifc: <http://ifcowl.openbimstandards.org/IFC2X3_TC1#>
+PREFIX express:  <https://w3id.org/express#>
 
-SELECT ?w
+SELECT ?guid
 WHERE {
     ?w a ifc:IfcWallStandardCase .
+    ?w ifc:globalId_IfcRoot ?guid_box .
+    ?guid_box express:hasString ?guid .
     FILTER NOT EXISTS {
         ?rel a ifc:IfcRelVoidsElement .
         ?rel ifc:RelatingBuildingElement_IfcRelVoidsElement ?w .
     }
 }
+ORDER BY asc(?guid)
