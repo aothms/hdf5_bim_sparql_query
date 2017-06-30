@@ -13,6 +13,8 @@ if VERBOSE:
 
 print_section = lambda s,q: (print("\n"+s), print('-'*len(s)), print(q))
 
+# profile.disable_by_count()
+
 query_text = open(sys.argv[2]).read()
 q = query.query(query_text)
 if VERBOSE: print_section("Original query:", q)

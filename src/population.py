@@ -24,6 +24,53 @@ import prefixes
 # Just something stupid in case not running in kernprof
 if 'line_profiler' not in sys.modules: profile = lambda a: a
 
+class hdf5_dataset_iterator(object):
+    
+    """A lazy evaluation of a rdf:type triple pattern solution"""
+    
+    class bound(object):
+        def __init__(self, it, T, idx):
+            self.it  = it
+            self.T   = T
+            self.idx = idx
+        def __iter__(self):
+            it  = self.it
+            T   = self.T
+            idx = self.idx
+            
+            N = len(T._fields)
+            vs = [None] * N
+            
+            for i in it:
+                vs[idx] = i
+                yield tuple.__new__(T, vs)
+        def __repr__(self):
+            p = self.it.population
+            d = self.it.dsid
+            n = self.it.dsnm
+            sizes, _ = self.it.population.population.shape_dtype(n + "_instances")
+            return "{%s ... %s}" % (hdf5_instance_reference(p,d,0), hdf5_instance_reference(p,d,sizes[0]-1))
+        def __len__(self):
+            n = self.it.dsnm
+            sizes, _ = self.it.population.population.shape_dtype(n + "_instances")
+            return sizes[0]
+    
+    def __init__(self, population, dsid, dsnm):
+        self.population = population
+        self.dsnm = dsnm
+        self.dsid = dsid
+    def __iter__(self):
+        p = self.population
+        d = self.dsid
+        n = self.dsnm
+        sizes, _ = p.population.shape_dtype(n + "_instances")
+        return (hdf5_instance_reference(p, d, i) for i in xrange(sizes[0]))
+    def bind(self, T, idx):
+        return self.bound(self, T, idx)
+        
+hdf5_dataset_iterator_bound = hdf5_dataset_iterator.bound
+    
+
 class hdf5_instance_reference(object):
 
     """A representation of an HDF5 entity instance reference. This is a 
@@ -90,7 +137,7 @@ class population(object):
         self.list_index = 1
         
     def format_ref_string(self, dsid, instid):
-        if type(dsid) != str: dsid = self.dataset_names[dsid]
+        if not isinstance(dsid, basestring): dsid = self.dataset_names[dsid]
         return "%s%s_%d" % (prefixes.INSTANCE, dsid, instid)        
     
     def format_ref(self, dsid, instid):
@@ -165,10 +212,11 @@ class population(object):
             if isinstance(x, query.query.triple):
                 context.feed(x, self.triples(x, context))
             else:
+                x.init(self)
                 context.filter(x)
             times.append(time.time() - t10)
         
-            # context.print_results()
+            # context.print_results_table(all=True)
         
         if q.right:
             context2 = query_context.query_context(q.right)
@@ -198,6 +246,26 @@ class population(object):
         
     @profile
     def triples(self, triplefilter=None, context=None):
+        if triplefilter:
+            get_from_context = lambda v: context.get(v, v)
+            filter_values = map(get_from_context, triplefilter)
+            
+            if not isinstance(filter_values[0], set) and filter_values[1] == RDF.type:
+            
+                # print ("Filter values")
+                # print (filter_values)
+                # print ()
+                
+                owl_dt_to_ifc = lambda t: t[len(schema.PREFIX):]
+                ifct = owl_dt_to_ifc(filter_values[2])
+                find = lambda arr, val: numpy.nonzero(arr == val)[0][0]
+                return hdf5_dataset_iterator(self, find(self.dataset_names, ifct), ifct)
+
+        return self.triples_generator(triplefilter, context)
+            
+
+    @profile
+    def triples_generator(self, triplefilter=None, context=None):
     
         datasets_included_by_subjects = None
         datasets_included_by_predicate = None
@@ -217,6 +285,11 @@ class population(object):
             if isinstance(filter_values[0], set):
                 # datasets_included_by_subjects = set(map(lambda uri: uri.split('_')[0][1:], filter_values[0]))
                 datasets_included_by_subjects = set(map(operator.attrgetter('dsid'), filter_values[0]))
+            elif type(filter_values[0]) == hdf5_dataset_iterator_bound:
+                datasets_included_by_subjects = set([filter_values[0].it.dsid])
+                
+            # if type(filter_values[0]) == hdf5_dataset_iterator_bound and type(filter_values[2]) == hdf5_dataset_iterator_bound:
+            #     profile.enable_by_count()
                 
             to_dsid = lambda t: self.dataset_name_to_id.get(t)
             owl_dt_to_ifc = lambda t: t[len(schema.PREFIX):]
@@ -251,6 +324,9 @@ class population(object):
                         # Set elements are already formatted as they have been emitted before
                         match_ob = filter_values[2]
                         match_ob_fn = lambda v: v in match_ob
+                    elif type(filter_values[2]) == hdf5_dataset_iterator_bound:
+                        dsid_to_match = filter_values[2].it.dsid
+                        match_ob_fn = lambda v: v.dsid == dsid_to_match
                     else:
                         match_ob = next(self.format(False, filter_values[2]))
                         match_ob_fn = lambda v: v == match_ob
@@ -314,22 +390,27 @@ class population(object):
             if not lazy:
                 ds_data_enum = enumerate(ds_data)
             if filter_values and not isinstance(filter_values[0], rdflib.term.Variable):
+            
                 if isinstance(filter_values[0], set):
                     subs_in_ds = filter(lambda x: x.dsid == dsid, filter_values[0])
                     inst_ids = set(map(operator.attrgetter('instid'), subs_in_ds))
+                    
+                    if lazy:
+                        # TODO, stop encoding this in hashsets, use ranges and binary search sorted lists?
+                        sorted_inst_ids = sorted(inst_ids)
+                        ds_data_enum = itertools.izip(sorted_inst_ids, ds_data[sorted_inst_ids])
+                    else:
+                        ds_data_enum = ((i, ds_data[i]) for i in inst_ids)
+                        # What was I thinking here:
+                        # ds_data_enum = filter(lambda a: a[0] in inst_ids, ds_data_enum)
+                        
+                elif type(filter_values[0]) == hdf5_dataset_iterator_bound:
+                    ds_data_enum = enumerate(ds_data)
+                    
                 else:
                     raise Exception("I did not expect a single URI reference as subject")
-                # print(inst_ids, file=sys.stderr)
+                # print(inst_ids, file=sys.stderr)                
                 
-                if lazy:
-                    # TODO, stop encoding this in hashsets, use ranges and binary search sorted lists?
-                    sorted_inst_ids = sorted(inst_ids)
-                    ds_data_enum = itertools.izip(sorted_inst_ids, ds_data[sorted_inst_ids])
-                else:
-                    ds_data_enum = ((i, ds_data[i]) for i in inst_ids)
-                    # What was I thinking here:
-                    # ds_data_enum = filter(lambda a: a[0] in inst_ids, ds_data_enum)
-
             num_attrs = schema.num_attributes[nm]
             
             for i, (is_ref, dt) in enumerate(zip(is_instance_ref, dts)):

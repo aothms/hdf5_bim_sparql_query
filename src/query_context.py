@@ -36,6 +36,7 @@ class query_context(object):
                 s = self.solution[i]
                 break
         if s is None: return default
+        elif s.__class__.__name__ == 'bound': return s
         else: return set(map(operator.itemgetter(n), s))
             
     # TODO: Should probably throw
@@ -124,6 +125,11 @@ class query_context(object):
         vars = [self.vars.index(str(v)) for v in self.proj]
         for v in self:
             print(" ".join(str(v[n]) for n in vars), file=output)
+            
+    def project(self):
+        vars = [self.vars.index(str(v)) for v in self.proj]
+        for v in self:
+            yield tuple(v[n] for n in vars)
         
     def __repr__(self, table=False):
         b = StringIO()
@@ -135,6 +141,8 @@ class query_context(object):
 
     @profile
     def intersect_2(self, other, vars):
+        raise Exception("Still used?")
+        
         assert len(self.solution) == 1
         assert len(other.solution) == 1
 
@@ -186,7 +194,8 @@ class query_context(object):
         self.solution[0][:] = r
 
     @profile
-    def intersect(self, a, b, keys):
+    def intersect(self, A, B, keys):
+    
         itemsgetter = lambda ks: lambda v: tuple(v[i] for i in ks)
         g = itemsgetter(keys)
         
@@ -197,8 +206,11 @@ class query_context(object):
         # Ag = itertools.groupby(A, operator.itemgetter(0))
         # Bg = itertools.groupby(B, operator.itemgetter(0))
         
-        A = sorted(a, key=g)
-        B = sorted(b, key=g)
+        # Bound objects sorted by definition
+        if A.__class__.__name__ != "bound":
+            A = sorted(A, key=g)
+        if B.__class__.__name__ != "bound":
+            B = sorted(B, key=g)
         Ag = itertools.groupby(A, g)
         Bg = itertools.groupby(B, g)
         
@@ -286,13 +298,11 @@ class query_context(object):
         return self.t(*d)
         
     def flatten(self):
-        print(self.bonds)
         while len(self.bonds) > 1:
             self.merge(self.bonds[0][0], self.bonds[1][0])
-        print(self.bonds)
         
     @profile        
-    def merge(self, x, y):
+    def merge(self, x, y, r=None):
         # See if there is already a connection established between the two variables
         for i, b in enumerate(self.bonds):
             if x in b and y in b:
@@ -309,7 +319,8 @@ class query_context(object):
         elif sy is None:
             r, b = sx, self.bonds[bx]
         else:
-            r = map(self.make_tuple1, itertools.product(sx, sy))
+            if r is None:
+                r = map(self.make_tuple1, itertools.product(sx, sy))
             b = tuple(sorted(set(self.bonds[bx]) | set(self.bonds[by])))
             
         mins, maxs = min(bx, by), max(bx, by)
@@ -365,8 +376,10 @@ class query_context(object):
 
         @profile
         def tuple_contents(t):
+            # print(t)
             vs = [None] * N
             for vpos, tpos in variable_to_triple_position:
+                # print(vpos, tpos)
                 vs[vpos] = t[tpos]
             return vs
             
@@ -383,7 +396,12 @@ class query_context(object):
         # print(make_tuple2(triples[0]))
 
         # x = [fn(is_var, names, t) for t in triples]
-        x = [new(T, tuple_contents(t)) for t in triples]
+        
+        if type(triples).__name__ == "hdf5_dataset_iterator":
+            assert len(variable_to_triple_position) == 1
+            x = triples.bind(T, variable_to_triple_position[0][0])
+        else:
+            x = [new(T, tuple_contents(t)) for t in triples]
         # x = map(functools.partial(self.make_tuple2, is_var, names), triples)
                 
         if len(names) == 0 or len(names) == 3:
@@ -395,7 +413,20 @@ class query_context(object):
                     s = self.solution[i]
                     break
         else:
-            i, b, s = self.merge(*names)
+        
+            # Try to prevent a cartesian product here
+            x_, y_ = names
+            for i_, b_ in enumerate(self.bonds):
+                if x_ in b_: bx = i_
+                if y_ in b_: by = i_
+            x3 = None
+            if bx != by and sorted(names) == sorted((bx, by)) and None not in (self.solution[bx], self.solution[by]):
+                k = set(names) & set(self.bonds[bx])
+                x2 = self.intersect(self.solution[bx], x, keys=k)
+                k = set(names) & set(self.bonds[by])
+                x3 = self.intersect(self.solution[by], x2, keys=k)
+                        
+            i, b, s = self.merge(*names, r=x3)
             
         if s is None:
             self.solution[i] = x

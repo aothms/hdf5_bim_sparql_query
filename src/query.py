@@ -90,6 +90,52 @@ class query(object):
             return type(self).key(self, **kwargs)
     
     class filter(statement):
+    
+        query = None
+    
+        def _make_Builtin_NOTEXISTS(self, expr):
+            self.query = query(bgp=expr['graph']['part'][0])
+            self.vars = set(self.query.vars)
+            
+        def build(self):
+            if self.query:
+                q = self.query
+                is_triple = lambda st: isinstance(st, query.triple)
+                
+                def list_immediate_variables(stmts):
+                    # i.e. variables not included in the FILTER we are currently processing
+                    for st in stmts:
+                        if not is_triple(st): continue
+                        for x in st:
+                            if x.__class__ == Variable:
+                                yield x
+                
+                self.vars = self.vars & set(list_immediate_variables(self.parent_query.statements))
+
+                for st in self.parent_query.statements:
+                    if is_triple(st):
+                        vars = set(list_immediate_variables([st]))
+                        if vars <= self.vars:
+                            q.statements.append(st)
+                
+                q.merge_paths()
+                q.infer()
+                q.sort()
+                
+                q.proj = self.vars
+                
+                self.s = "filter not exists on {%s}" % ",".join(self.vars)
+                
+        def init(self, population):
+            if self.query:
+                context = population.query(self.query)
+                # context.print_statistics()
+                results = set(context.project())
+                vars = [context.vars.index(str(v)) for v in context.proj]
+                def filter(tup):
+                    x = tuple(tup[n] for n in vars)
+                    return x not in results                    
+                self.fn = filter                
         
         def _make_Builtin_REGEX(self, expr):
             import re
@@ -140,12 +186,13 @@ class query(object):
             
             
         def __init__(self, q, expr):
+            self.parent_query = q
             getattr(self, "_make_%s" % expr.name)(expr)
             
         def key(self, known_variables, variable_ref_count):
             inf = float("inf")
             return (
-                (-inf if self.vars < known_variables else +inf),
+                (-inf if self.vars <= known_variables else +inf),
             )
             
         def __repr__(self):
@@ -369,8 +416,11 @@ class query(object):
             self.vars = project._vars
             # print("vars", self.vars)
             self.proj = project['PV']
-            
             bgp = project['p']
+            self.vars2 = bgp._vars
+        else:
+            self.vars = bgp._vars
+            self.proj = self.vars
 
         self.make_triple = functools.partial(query.triple, self)
         self.make_filter = functools.partial(query.filter, self)
@@ -380,13 +430,14 @@ class query(object):
             return (expr.expr, 1 if expr.order == 'ASC' else -1)
             
         self.statements = []
+        self.filters = []
             
         def recurse(query_instance, asn):
             
             if asn.name == 'OrderBy':
                 query_instance.order = map(make_order, asn.expr)
                 recurse(query_instance, asn.p)
-            elif asn.name == 'BGP':
+            elif asn.name == 'BGP' or asn.name == 'TriplesBlock':
                 query_instance.statements += map(query_instance.make_triple, asn.triples)
             elif asn.name == 'Filter':
                 expr = asn.expr
@@ -397,7 +448,9 @@ class query(object):
                             for y in visit(x): yield y
                     else: yield expr
                 
-                query_instance.statements += map(query_instance.make_filter, visit(expr))
+                fs = map(query_instance.make_filter, visit(expr))
+                query_instance.statements += fs
+                self.filters += fs
                 recurse(query_instance, asn.p)
             elif asn.name == 'LeftJoin' or asn.name == 'Join' or asn.name == 'Union':
                 recurse(query_instance, asn.p1)
@@ -430,6 +483,9 @@ class query(object):
         # Necesssary as it also decorates property paths
         self.validate()
 
+        for f in self.filters:
+            f.build()
+            
         """
         if bgp.name == 'OrderBy':
             self.order = map(make_order, bgp.expr)
