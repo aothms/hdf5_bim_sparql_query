@@ -29,7 +29,7 @@ done
 
 echo "Obtaining jena"
 cd $BUILDPATH
-wget -qq http://apache.mirror.triple-it.nl/jena/binaries/apache-jena-3.1.1.tar.gz
+wget -qq https://archive.apache.org/dist/jena/binaries/apache-jena-3.1.1.tar.gz
 tar -xf apache-jena-3.1.1.tar.gz
 
 
@@ -60,6 +60,7 @@ echo "Obtaining and building hdt"
 cd $BUILDPATH
 git clone -q https://github.com/rdfhdt/hdt-java
 cd hdt-java
+git checkout -q v2.0
 mvn -q package &> /dev/null
 
 
@@ -86,7 +87,7 @@ cd zlib-1.2.11/
 ./configure --prefix=$BUILDPATH/zlib-1.2.11/install &> /dev/null
 make -j install &> /dev/null
 cd $BUILDPATH
-wget -qq https://support.hdfgroup.org/ftp/HDF5/current18/src/hdf5-1.8.18.tar.gz
+wget -qq https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.8/hdf5-1.8.18/src/hdf5-1.8.18.tar.gz
 tar -xf hdf5-1.8.18.tar.gz
 cd hdf5-1.8.18/
 ./configure --enable-cxx --enable-production --with-zlib=$BUILDPATH/zlib-1.2.11/install &> /dev/null
