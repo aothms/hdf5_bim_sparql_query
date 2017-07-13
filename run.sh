@@ -130,12 +130,12 @@ mv Clinic_MEP_20110906_optimized.ifc clinic/clinic.ifc
 mv Architectural/DC_Riverside_Bldg-LOD_300.ifc riverside/riverside.ifc
 mv schependomlaan.ifc schependomlaan/schependomlaan.ifc
 
+touch $BUILDPATH/setup
+
 echo "Everything setup, you are advised to run the script with taskset -c 0 /bin/bash run.sh"
 read -n 1 -s -p "Press any key to continue...
 "
 
-
-touch $BUILDPATH/setup
 fi
 
 
