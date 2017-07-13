@@ -144,12 +144,12 @@ class population(object):
         return hdf5_instance_reference(self, dsid, instid)
     
     @profile
-    def format(self, is_ref, ob, list_range=[None]): #, enum=None, vlen=None):
+    def format(self, is_ref, ob, list_range_slice=slice(None)): #, enum=None, vlen=None):
         tob = type(ob)
     
         if tob == numpy.ndarray:
             # print(tob, ob, file=sys.stderr)
-            for x in ob[slice(*list_range)]:
+            for x in ob[list_range_slice]:
                 for y in self.format(is_ref, x): yield y
         elif is_ref:
             yield hdf5_instance_reference(self, ob[0], ob[1])
@@ -272,7 +272,7 @@ class population(object):
         datasets_included_explicitly = None
         pred_name = None
         pred_isa = False
-        list_range = [None]
+        list_range = slice(None)
         
         if triplefilter:
             get_from_context = lambda v: context.get(v, v)
@@ -302,7 +302,7 @@ class population(object):
             if isinstance(filter_values[1], query.path):
                 path = filter_values[1]
                 if path.list_accessor:
-                    list_range = path.list_range
+                    list_range = slice(*path.list_range)
                 filter_values_1 = path.attribute
             else:
                 filter_values_1 = filter_values[1]
@@ -457,7 +457,7 @@ class population(object):
                         #             yield subj, "ifc:" + (schema.attr_dict[nm][ds_names[i]]), v
                         # else:
                         if True:
-                            for v in self.format(is_ref, v, list_range=list_range): #, **m):
+                            for v in self.format(is_ref, v, list_range_slice=list_range): #, **m):
                             
                                 """
                                 if match_ob is not None:

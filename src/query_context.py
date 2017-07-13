@@ -373,11 +373,14 @@ class query_context(object):
         # print(is_var, names)
         # print(variable_to_triple_position)
         # print(triples[0])
+        
+        vs_ = [None] * N
+        vs = [None] * N
 
         @profile
         def tuple_contents(t):
             # print(t)
-            vs = [None] * N
+            vs[:] = vs_
             for vpos, tpos in variable_to_triple_position:
                 # print(vpos, tpos)
                 vs[vpos] = t[tpos]
@@ -420,7 +423,13 @@ class query_context(object):
                 if x_ in b_: bx = i_
                 if y_ in b_: by = i_
             x3 = None
-            if bx != by and sorted(names) == sorted((bx, by)) and None not in (self.solution[bx], self.solution[by]):
+            
+            # print(filter_)
+            # print("bx", bx, "by", by, "names", names)
+            # print("bonds", self.bonds)
+            
+            # sorted(names) == sorted((bx, by)) and ?
+            if bx != by and None not in (self.solution[bx], self.solution[by]):
                 k = set(names) & set(self.bonds[bx])
                 x2 = self.intersect(self.solution[bx], x, keys=k)
                 k = set(names) & set(self.bonds[by])
