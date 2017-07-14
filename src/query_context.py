@@ -191,7 +191,10 @@ class query_context(object):
                 r.append(self.make_tuple1(x, y))
                 
         # TODO: Immutable
-        self.solution[0][:] = r
+        if self.solution[0].__class__.__name__ == 'bound':
+            self.solution[0] = r
+        else:
+            self.solution[0][:] = r
 
     @profile
     def intersect(self, A, B, keys):

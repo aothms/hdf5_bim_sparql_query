@@ -54,6 +54,9 @@ class hdf5_dataset_iterator(object):
             n = self.it.dsnm
             sizes, _ = self.it.population.population.shape_dtype(n + "_instances")
             return sizes[0]
+        def __getitem__(self, idx):
+            if idx == slice(None):
+                return self.__class__(self.it, self.T, self.idx)
     
     def __init__(self, population, dsid, dsnm):
         self.population = population
