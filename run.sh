@@ -130,6 +130,16 @@ mv Clinic_MEP_20110906_optimized.ifc clinic/clinic.ifc
 mv Architectural/DC_Riverside_Bldg-LOD_300.ifc riverside/riverside.ifc
 mv schependomlaan.ifc schependomlaan/schependomlaan.ifc
 
+
+echo "Calculating model statistics"
+for model in duplex clinic office riverside schependomlaan
+do
+    cd $SCRIPTPATH/files/$model
+    # This is a horribly slow way to calculate the amount of instances, but it is the only thing the preview1 wrapper provided
+    python -c "import ifcopenshell; f = ifcopenshell.open('$model.ifc'); products = f.by_type('IfcProduct'); elems = f.by_type('IfcBuildingElement'); print '$model,%d,%d,%s' % (len(f.wrapped_data.entity_names()), len(products), products[len(elems)//2].GlobalId)" >> ../../model_stats.csv
+done
+
+
 touch $BUILDPATH/setup
 
 echo "Everything setup, you are advised to run the script with taskset -c 0 /bin/bash run.sh"
