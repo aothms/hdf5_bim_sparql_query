@@ -1,0 +1,10 @@
+PREFIX ifc: <http://ifcowl.openbimstandards.org/IFC2X3_TC1#>
+PREFIX express:  <https://w3id.org/express#>
+
+SELECT ?name
+WHERE {
+    ?elem ifc:globalId_IfcRoot ?guid_box .
+    ?guid_box express:hasString GUID .
+    ?elem ifc:name_IfcRoot ?name_box .
+    ?name_box express:hasString ?name .
+}

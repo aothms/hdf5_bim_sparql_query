@@ -1,0 +1,10 @@
+PREFIX ifc: <http://ifcowl.openbimstandards.org/IFC2X3_TC1#>
+PREFIX express:  <https://w3id.org/express#>
+PREFIX list:  <https://w3id.org/list#>
+
+SELECT ?latitude
+WHERE {
+    ?site ifc:refLatitude_IfcSite ?latitude_list .
+    ?latitude_list list:hasContents ?latitude_box .
+    ?latitude_box express:hasInteger ?latitude .
+}
