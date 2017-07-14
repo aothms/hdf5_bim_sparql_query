@@ -261,8 +261,9 @@ class population(object):
                 
                 owl_dt_to_ifc = lambda t: t[len(schema.PREFIX):]
                 ifct = owl_dt_to_ifc(filter_values[2])
-                find = lambda arr, val: numpy.nonzero(arr == val)[0][0]
-                return hdf5_dataset_iterator(self, find(self.dataset_names, ifct), ifct)
+                nz = numpy.nonzero(self.dataset_names == ifct)[0]
+                if len(nz) == 0: return []
+                return hdf5_dataset_iterator(self, nz[0], ifct)
 
         return self.triples_generator(triplefilter, context)
             
