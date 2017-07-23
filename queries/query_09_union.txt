@@ -1,0 +1,16 @@
+PREFIX ifc: <http://ifcowl.openbimstandards.org/IFC2X3_TC1#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX express: <https://w3id.org/express#>
+
+SELECT ?elem ?width
+WHERE {
+    {
+        ?elem a ifc:IfcDoor .
+        ?elem ifc:overallWidth_IfcDoor ?width_box .
+        ?width_box express:hasDouble ?width .
+    } UNION {
+        ?elem a ifc:IfcWindow .
+        ?elem ifc:overallWidth_IfcWindow ?width_box .
+        ?width_box express:hasDouble ?width .    
+    }
+}

@@ -195,6 +195,9 @@ class query_context(object):
             self.solution[0] = r
         else:
             self.solution[0][:] = r
+            
+    def union(self, other, keys):
+        self.solution[0] += other.solution[0]
 
     @profile
     def intersect(self, A, B, keys):
