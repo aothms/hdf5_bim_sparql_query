@@ -13,4 +13,4 @@ WHERE {
         ?elem ifc:overallWidth_IfcWindow ?width_box .
         ?width_box express:hasDouble ?width .    
     }
-}
+} LIMIT 10 OFFSET 10

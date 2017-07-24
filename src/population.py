@@ -243,6 +243,7 @@ class population(object):
             times.extend(context2.stats[1])
 
         context.sort(q.order)
+        context.slice(q.slice)
         
         context.stats = time.time() - t00, times
         return context

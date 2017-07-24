@@ -70,6 +70,11 @@ class query_context(object):
                 idx = self.varnames[str(var)]
                 s[:] = sorted(s, key=operator.itemgetter(idx), reverse=desc==-1)
     
+    def slice(self, slc):
+        for s in self.solution:
+            if s is None: continue
+            s[:] = s[slc]
+    
     def print_results_table(self, output=None, all=False):
         if output is None: output = sys.stdout
         

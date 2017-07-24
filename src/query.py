@@ -407,16 +407,20 @@ class query(object):
         self.order = []
         self.right = None
         self.proj = None
+        self.slice = slice(None)
     
         if query_text:
             asn = sparql.parser.parseQuery(query_text)
             q = sparql.algebra.translateQuery(asn)
+            alg = q.algebra.p
+            if alg.name == 'Slice':
+                self.slice = slice(alg.start, alg.start + alg.length)
+                alg = alg.p
             self.ns = q.prologue.namespace_manager
-            project = q.algebra['p']
-            self.vars = project._vars
+            self.vars = alg._vars
             # print("vars", self.vars)
-            self.proj = project['PV']
-            bgp = project['p']
+            self.proj = alg.PV
+            bgp = alg.p
             self.vars2 = bgp._vars
         else:
             self.vars = bgp._vars
